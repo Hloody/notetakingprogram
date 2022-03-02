@@ -43,6 +43,7 @@ endif
 #   creates a softlink to OUT_FULL called OUT
 # $@: $^
 $(OUT_DIR)/$(OUT_FULL): $(OBJS)
+	@mkdir -p $(OUT_DIR)
 	@echo linking executable
 	@$(LL) -o $@ $^ $(CFLAGS) $(LIBS)
 	@echo creating symbolic link
@@ -52,6 +53,7 @@ $(OUT_DIR)/$(OUT_FULL): $(OBJS)
 
 #C files
 $(ODIR)/%.c.o: $(SDIR)/%.c $(DEPS)
+	@mkdir -p $(ODIR)
 	@echo 'compiling $<'
 	@$(CC) -c -o $@ $< $(CFLAGS)
 
