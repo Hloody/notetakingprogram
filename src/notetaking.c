@@ -18,22 +18,7 @@
 #include "note_compare.h"
 
 /*
-TODO: implement metadata for notes such as:
-	datetime - created, last edited
-	IDEA: same as .map format (htdg)
-		first line metadata (json)
-		rest: plaintext (markdown)
-*/
-
-/*
-TODO: implement TODO notes
-	features:
-		priority
-		name
-		status (done, not done, started, custom)
-		deadline
-		subnotes - allow users to write some info to each TODO
-	access TODO notes from CLI
+TODO: add subtodo support
 */
 
 void
@@ -146,11 +131,13 @@ ntp_main( void ) {
 
 				}
 
+				size_t row_y = 0;
+
 				/* print note preview */
 				/* TODO: move to a function to be called everytime a note needs to be shown (previews, note display,...) */
 				/* TODO: implement scrolling */
 				/* print note name */
-				move( 0, 1 + hx );
+				move( row_y++, 1 + hx );
 				attron( COLOR_PAIR( HIGHLIGHT_PAIR ) );
 				addstr( "Note name:" );
 				attroff( COLOR_PAIR( HIGHLIGHT_PAIR ) );
@@ -165,7 +152,7 @@ ntp_main( void ) {
 				}
 
 				/* print metadata */
-				move( 1, 1 + hx );
+				move( row_y++, 1 + hx );
 				attron( COLOR_PAIR( HIGHLIGHT_PAIR ) );
 				addstr( "Metadata:" );
 				attroff( COLOR_PAIR( HIGHLIGHT_PAIR ) );
@@ -174,16 +161,32 @@ ntp_main( void ) {
 				struct tm last_edit_tm;
 				localtime_r( &note->last_edit, &last_edit_tm );
 				char last_edit[ 64 ];
-				strftime( last_edit, arraysize( last_edit ) - 1, "%d.%m.%Y %H:%M:%S", &last_edit_tm );
 
 				struct tm created_tm;
 				localtime_r( &note->created, &created_tm );
 				char created[ 64 ];
-				strftime( created, arraysize( created ) - 1, "%d.%m.%Y %H:%M:%S", &created_tm );
 
-				printw( " created: %s, modified: %s", created, last_edit );
+				/* if full metadata string fits */
+				if ( x - hx > strlen( "Metadata: created: DD.MM.YY HH:mm:SS, modified: DD.MM.YY HH:mm:SS" ) ) {
+					/* full metadata */
+					strftime( last_edit, arraysize( last_edit ) - 1, "%d.%m.%Y %H:%M:%S", &last_edit_tm );
+					strftime( created,   arraysize( created   ) - 1, "%d.%m.%Y %H:%M:%S", &created_tm   );
+
+					printw( " created: %s, modified: %s", created, last_edit );
+				} else {
+					/* abreviates "created" and "modified", removes time, keeps date */
+					strftime( last_edit, arraysize( last_edit ) - 1, "%d.%m.%Y", &last_edit_tm );
+					strftime( created,   arraysize( created   ) - 1, "%d.%m.%Y", &created_tm   );
+
+					char buffer[ 1024 ];
+					sprintf( buffer, " cre: %s, mod: %s", created, last_edit );
+
+					addnstr( buffer, x - hx - strlen( "Metadata: " ) );
+				}
+
 				if ( note->tag_count != 0 ) {
-					addstr( ", tags: " );
+					move( row_y++, 1 + hx );
+					addstr( "  tags: " );
 
 					for ( size_t i = 0; i < note->tag_count; i++ ) {
 						addstr( note->tags[ i ] );
@@ -193,7 +196,7 @@ ntp_main( void ) {
 				}
 
 				/* print note contents */
-				move( 2, 1 + hx );
+				move( row_y++, 1 + hx );
 				attron( COLOR_PAIR( HIGHLIGHT_PAIR ) );
 				addstr( "Contents:" );
 				attroff( COLOR_PAIR( HIGHLIGHT_PAIR ) );
@@ -201,7 +204,7 @@ ntp_main( void ) {
 
 				/* TODO: find a way to do line wrapping */
 
-				size_t p_y = 3;
+				size_t p_y = row_y;
 				size_t p_x = 0;
 
 				for ( size_t i = 0; i < rendered_note.count; i++ ) {
@@ -222,44 +225,62 @@ ntp_main( void ) {
 										mvprintw( p_y, p_x + hx + 1, "%c", rendered_note.segments[ i ].text[ j ] );
 										p_x++;
 								}
+
+								/* reached right side of the "window" */
+								if ( p_x + hx + 1 >= x ) {
+									p_x = 0;
+									p_y++;
+								}
 							}
 							break;
 
 						case st_todo: {
-							struct segment_todo* todo = &rendered_note.segments[ i ].todo;
+							const struct segment_todo* todo = &rendered_note.segments[ i ].todo;
 
-							attron( COLOR_PAIR( HIGHLIGHT_SEGMENT_PAIR ) );
+							char buffer[ 64 + strlen( todo->priority ) + strlen( todo->goal ) + ( todo->status != NULL ? strlen( todo->status ) : 0 ) + ( todo->date != NULL ? strlen( todo->date ) : 0 ) ];
+							size_t buffer_index = 0;
 
-							move( p_y, p_x + hx + 1 );
-						
 							/* priority */
-							printw( "[" );
-							printw( todo->priority );
-							printw( "]" );
-							p_x += 2 + strlen( todo->priority );
+							buffer_index += sprintf( buffer + buffer_index, "[%s]", todo->priority );
 
 							/* status */
 							if ( todo->status != NULL ) {
-								printw( "[" );
-								printw( todo->status );
-								printw( "]" );
-								p_x += 2 + strlen( todo->status );
+								buffer_index += sprintf( buffer + buffer_index, "[%s]", todo->status );
 							}
 							
 							/* date/deadline */
 							if ( todo->date != NULL ) {
-								printw( "[" );
-								printw( todo->date );
-								printw( "]" );
-								p_x += 2 + strlen( todo->date );
+								buffer_index += sprintf( buffer + buffer_index, "[%s]", todo->date );
 							}
 
 							/* goal */
-							printw( " " );
-							printw( todo->goal );
-							p_x += 1 + strlen( todo->goal );
+							buffer_index += sprintf( buffer + buffer_index, " " );
+							buffer_index += sprintf( buffer + buffer_index, todo->goal );
 
-							attroff( COLOR_PAIR( HIGHLIGHT_SEGMENT_PAIR ) );
+							if ( config.colour_segments ) attron( COLOR_PAIR( HIGHLIGHT_SEGMENT_PAIR ) );
+							for ( size_t i = 0; i < buffer_index; i++ ) {
+								switch ( buffer[ i ] ) {
+									case '\n':
+										p_x = 0;
+										p_y++;
+										break;
+
+									case '\t':
+										p_x += 4;
+										break;
+
+									default:
+										mvprintw( p_y, p_x + hx + 1, "%c", buffer[ i ] );
+										p_x++;
+								}
+
+								/* reached right side of the "window" */
+								if ( p_x + hx + 1 >= x ) {
+									p_x = 0;
+									p_y++;
+								}
+							}
+							if ( config.colour_segments ) attroff( COLOR_PAIR( HIGHLIGHT_SEGMENT_PAIR ) );
 							}
 							break;
 					}
@@ -270,7 +291,7 @@ ntp_main( void ) {
 		/* footer */
 		attron( COLOR_PAIR( FOOTER_PAIR ) );
 
-		const char* footer_text = " n - new note | r - search | R - rescan notes | enter - open selected note | q - quit | tab - change view | S - settings ";
+		const char* footer_text       = " n - new note | r - search | R - rescan notes | enter - open selected note | q - quit | tab - change view | S - settings ";
 		const char* small_footer_text = " n - new note | r - search | q - quit ";
 
 		/* footer fits on screen */

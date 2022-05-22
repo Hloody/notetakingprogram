@@ -518,17 +518,15 @@ note_display( const char* p_note_path ) {
 			char created[ 64 ];
 			strftime( created, arraysize( created ) - 1, "%d.%m.%Y %H:%M:%S", &created_tm );
 
-			fprintf( less_, " created: %s, modified: %s", created, last_edit );
+			fprintf( less_, " created: %s, modified: %s\n", created, last_edit );
 			if ( note->tag_count != 0 ) {
-				fputs( ", tags: ", less_ );
+				fputs( "\n  tags: ", less_ );
 
 				for ( size_t i = 0; i < note->tag_count; i++ ) {
 					fputs( note->tags[ i ], less_ );
 					if ( i != note->tag_count - 1 ) fputs( ", ", less_ );
 				}
 
-				fputs( "\n", less_ );
-			} else {
 				fputs( "\n", less_ );
 			}
 
@@ -585,7 +583,12 @@ note_display( const char* p_note_path ) {
 		clear();
 		fill_screen();
 
+		w_w = getmaxx( stdscr ); w_h = getmaxy( stdscr );
+
+		size_t row_y = 0;
+
 		/* print note name */
+		move( row_y++, 0 );
 		attron( COLOR_PAIR( HIGHLIGHT_PAIR ) );
 		addstr( "Note name:" );
 		attroff( COLOR_PAIR( HIGHLIGHT_PAIR ) );
@@ -594,7 +597,7 @@ note_display( const char* p_note_path ) {
 		addstr( note->path );
 
 		/* print metadata */
-		move( 1, 0 );
+		move( row_y++, 0 );
 		attron( COLOR_PAIR( HIGHLIGHT_PAIR ) );
 		addstr( "Metadata:" );
 		attroff( COLOR_PAIR( HIGHLIGHT_PAIR ) );
@@ -612,7 +615,8 @@ note_display( const char* p_note_path ) {
 
 		printw( " created: %s, modified: %s", created, last_edit );
 		if ( note->tag_count != 0 ) {
-			addstr( ", tags: " );
+			move( row_y++, 0 );
+			addstr( "  tags: " );
 
 			for ( size_t i = 0; i < note->tag_count; i++ ) {
 				addstr( note->tags[ i ] );
@@ -622,13 +626,13 @@ note_display( const char* p_note_path ) {
 		}
 
 		/* print note contents */
-		move( 2, 0 );
+		move( row_y++, 0 );
 		attron( COLOR_PAIR( HIGHLIGHT_PAIR ) );
 		addstr( "Contents:" );
 		attroff( COLOR_PAIR( HIGHLIGHT_PAIR ) );
 		attron( COLOR_PAIR( DEFAULT_PAIR ) );
 
-		int x = 0, y = 3;
+		int x = 0, y = row_y;
 		for ( size_t i = 0; i < rendered_note.count; i++ ) {
 			switch ( rendered_note.segments[ i ].type ) {
 				case st_text:
@@ -647,43 +651,60 @@ note_display( const char* p_note_path ) {
 								mvprintw( y, x, "%c", rendered_note.segments[ i ].text[ j ] );
 								x++;
 						}
+
+						if ( w_w + 1 <= x ) {
+							x = 0;
+							y++;
+						}
 					}
 					break;
 
 				case st_todo: {
 					struct segment_todo* todo = &rendered_note.segments[ i ].todo;
 
-					if ( config.colour_segments ) attron( COLOR_PAIR( HIGHLIGHT_SEGMENT_PAIR ) );
-
-					move( y, x );
+					char buffer[ 64 + strlen( todo->priority ) + strlen( todo->goal ) + ( todo->status != NULL ? strlen( todo->status ) : 0 ) + ( todo->date != NULL ? strlen( todo->date ) : 0 ) ];
+					size_t buffer_index = 0;
 				
 					/* priority */
-					printw( "[" );
-					printw( todo->priority );
-					printw( "]" );
-					x += 2 + strlen( todo->priority );
+					buffer_index += sprintf( buffer + buffer_index, "[%s]", todo->priority );
 
 					/* status */
 					if ( todo->status != NULL ) {
-						printw( "[" );
-						printw( todo->status );
-						printw( "]" );
-						x += 2 + strlen( todo->status );
+						buffer_index += sprintf( buffer + buffer_index, "[%s]", todo->status );
 					}
 					
 					/* date/deadline */
 					if ( todo->date != NULL ) {
-						printw( "[" );
-						printw( todo->date );
-						printw( "]" );
-						x += 2 + strlen( todo->date );
+						buffer_index += sprintf( buffer + buffer_index, "[%s]", todo->date );
 					}
 
 					/* goal */
-					printw( " " );
-					printw( todo->goal );
-					x += 1 + strlen( todo->goal );
+					buffer_index += sprintf( buffer + buffer_index, " " );
+					buffer_index += sprintf( buffer + buffer_index, todo->goal );
 
+					if ( config.colour_segments ) attron( COLOR_PAIR( HIGHLIGHT_SEGMENT_PAIR ) );
+					for ( size_t i = 0; i < buffer_index; i++ ) {
+						switch ( buffer[ i ] ) {
+							case '\n':
+								x = 0;
+								y++;
+								break;
+
+							case '\t':
+								x += 4;
+								break;
+
+							default:
+								mvprintw( y, x, "%c", buffer[ i ] );
+								x++;
+						}
+
+						/* reached right side of the "window" */
+						if ( w_w + 1 <= x ) {
+							x = 0;
+							y++;
+						}
+					}
 					if ( config.colour_segments ) attroff( COLOR_PAIR( HIGHLIGHT_SEGMENT_PAIR ) );
 					}
 					break;
