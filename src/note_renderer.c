@@ -163,7 +163,7 @@ note_render_text( const char* p_note_something ) {
 
 					/* skip if not valid */
 					if ( todo->valid == false ) {
-						i += segment_end + 1;
+						i += segment_end + -1;
 						break;
 					}
 
@@ -175,60 +175,11 @@ note_render_text( const char* p_note_something ) {
 						strcpy( todo->priority, "0" );
 					}
 
-#ifdef AhfoauhfHO
-					/* TEMP: print TODO */
-
-					/* priority */
-					out[ j ] = '[';
-					j++;
-
-					int priority_size = strlen( todo.priority );
-					memcpy( out + j, todo.priority, priority_size );
-					j += priority_size;
-
-					out[ j ] = ']';
-					j++;
-
-					/* status */
-					if ( todo.status != NULL ) {
-						out[ j ] = '[';
-						j++;
-
-						int status_size = strlen( todo.status );
-						memcpy( out + j, todo.status, status_size );
-						j += status_size;
-
-						out[ j ] = ']';
-						j++;
-					}
-					
-					/* date/deadline */
-					if ( todo.date != NULL ) {
-						out[ j ] = '[';
-						j++;
-
-						int date_size = strlen( todo.date );
-						memcpy( out + j, todo.date, date_size );
-						j += date_size;
-
-						out[ j ] = ']';
-						j++;
-					}
-
-					out[ j ] = ' ';
-					j++;
-
-					/* goal */
-					int goal_size = strlen( todo.goal );
-					memcpy( out + j, todo.goal, goal_size );
-					j += goal_size;
-#endif
-					i += segment_end + 1 + 2;
-					prev_segment_end = i - 1;
+					/**/
+					i += segment_end - 1 + 2;
+					prev_segment_end = i - 1 + 2;
 
 					}
-
-					/* printf( "'printed'\n" ); */
 					break;
 
 				/* unknown segment type */
@@ -256,6 +207,31 @@ note_render_text( const char* p_note_something ) {
 		prev_segment_end = note_length - 1;
 	}
 
+	/* DEBUG print */
+	if ( false ) for ( size_t i = 0; i < output.count; i++ ) {
+		const char* segment_type_string = NULL;
+		char* segment_content_string = NULL;
+		char todo_buffer[ 1024 ];
+
+		switch ( output.segments[ i ].type ) {
+			case st_text:
+				segment_type_string = "text";
+				segment_content_string = output.segments[ i ].text;
+				break;
+			case st_todo:
+				segment_type_string = "todo";
+				segment_content_string = todo_buffer;
+				sprintf( todo_buffer, "[[TD|%s|%s|%s|%s]]",
+					output.segments[ i ].todo.priority, output.segments[ i ].todo.goal, output.segments[ i ].todo.date, output.segments[ i ].todo.status
+				);
+				break;
+		}
+
+		printf( "type: %s; text content: %s\n", segment_type_string, segment_content_string );
+
+		continue;
+	}
+
 	return output;
 }
 
@@ -266,6 +242,16 @@ free_rendered_note( struct rendered_note p_rn ) {
 			case st_text:
 				free( p_rn.segments[ i ].text );
 				break;
+			case st_todo:
+				free( p_rn.segments[ i ].todo.goal     );
+				free( p_rn.segments[ i ].todo.status   );
+				free( p_rn.segments[ i ].todo.priority );
+				free( p_rn.segments[ i ].todo.date     );
+				break;
 		}
 	}
+
+	free( p_rn.segments );
+
+	return;
 }
