@@ -30,7 +30,15 @@ popup_open_note( const char* p_note_path ) {
 			clear();
 			fill_screen();
 
+			int h = getmaxy( stdscr );
+
+			move( h / 2, 1 );
 			printw( "note name: %s", note_name );
+
+			/* fake cursor */
+			attron( COLOR_PAIR( SELECTOR_PAIR ) );
+			addstr( " " );
+			attroff( COLOR_PAIR( SELECTOR_PAIR ) );
 
 			refresh();
 
