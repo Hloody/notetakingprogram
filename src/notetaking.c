@@ -35,6 +35,8 @@ ntp_main( void ) {
 
 	size_t selected_note = 0;
 
+	bool preview_force_refresh = false;
+
 	while ( 1 ) {
 		clear();
 		fill_screen();
@@ -100,12 +102,14 @@ ntp_main( void ) {
 			} else {
 
 				/* get note contents */
-				if ( note_selector != selected_note ) {
+				if ( note_selector != selected_note || preview_force_refresh ) {
 					if ( note != NULL ) {
 						free_note( note );
 						note = NULL;
 					}
 					selected_note = note_selector;
+
+					preview_force_refresh = false;
 				}
 
 				if ( note == NULL ) {
@@ -333,6 +337,9 @@ ntp_main( void ) {
 				popup_notification_nonblocking( "Scanning notes" );
 				scan_notes();
 				sort_notes( config.sort_function );
+
+				preview_force_refresh = true;
+
 				break;
 
 				/*
