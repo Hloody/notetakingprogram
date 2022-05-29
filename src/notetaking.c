@@ -78,11 +78,27 @@ ntp_main( void ) {
 
 				move( 1 + i, 1 );
 
-				if ( screen_selector == 0 && selector == ( i - offset ) ) attron( COLOR_PAIR( SELECTOR_PAIR ) );
-				addstr( notes_list.note_paths[ i - offset ] );
-				if ( screen_selector == 0 && selector == ( i - offset ) ) {
-					attroff( COLOR_PAIR( SELECTOR_PAIR ) );
-					attron( COLOR_PAIR( DEFAULT_PAIR ) );
+				if ( note_selector == ( i - offset ) ) {
+					if ( screen_selector == 0 ) {
+						attroff( COLOR_PAIR( DEFAULT_PAIR ) );
+						attron( COLOR_PAIR( SELECTOR_PAIR ) );
+					} else {
+						attroff( COLOR_PAIR( DEFAULT_PAIR ) );
+						attron( COLOR_PAIR( HIGHLIGHT_PAIR ) );
+					}
+
+				}
+
+				addnstr( notes_list.note_paths[ i - offset ], hx - 1 );
+
+				if ( note_selector == ( i - offset ) ) {
+					if ( screen_selector == 0 ) {
+						attroff( COLOR_PAIR( SELECTOR_PAIR ) );
+						attron( COLOR_PAIR( DEFAULT_PAIR ) );
+					} else {
+						attroff( COLOR_PAIR( HIGHLIGHT_PAIR ) );
+						attron( COLOR_PAIR( DEFAULT_PAIR ) );
+					}
 				}
 
 				continue;
@@ -149,7 +165,7 @@ ntp_main( void ) {
 				addch( ' ' );
 
 				if ( screen_selector == 1 ) attron( COLOR_PAIR( SELECTOR_PAIR ) );
-				addstr( notes_list.note_paths[ selected_note ] );
+				addnstr( notes_list.note_paths[ selected_note ], x - hx - strlen( "Note name: " ) - 1 );
 				if ( screen_selector == 1 ) {
 					attroff( COLOR_PAIR( SELECTOR_PAIR ) );
 					attron( COLOR_PAIR( DEFAULT_PAIR ) );
@@ -366,7 +382,7 @@ ntp_main( void ) {
 		if ( screen_selector == 0 )
 			switch ( ch ) {
 				case KEY_ENTER: case '\n':
-					popup_open_note( notes_list.note_paths[ selector ] );
+					popup_open_note( notes_list.note_paths[ note_selector ] );
 
 					/* force program to refresh note */
 					if ( note != NULL ) free_note( note );
@@ -374,12 +390,10 @@ ntp_main( void ) {
 
 					break;
 				case KEY_DOWN:
-					if ( selector != ( notes_list.note_count - 1 ) ) selector++;
-					note_selector = selector;
+					if ( note_selector != ( notes_list.note_count - 1 ) ) note_selector++;
 					break;
 				case KEY_UP:
-					if ( selector != 0 ) selector--;
-					note_selector = selector;
+					if ( note_selector != 0 ) note_selector--;
 					break;
 			}
 		else
